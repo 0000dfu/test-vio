@@ -92,6 +92,10 @@ def watch(update: Update, context: CallbackContext) -> None:
     # تشغيل وظيفة المشاهدة باستخدام asyncio
     asyncio.run(watch_youtube_video(video_url))
 
+from telegram import Update
+from telegram.ext import Application, CommandHandler, ContextTypes
+
+# وظيفة أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     أمر /start لعرض رسالة ترحيب.
@@ -123,7 +127,7 @@ def main() -> None:
     تشغيل الروبوت.
     """
     # ضع هنا توكن البوت الخاص بك
-    TELEGRAM_TOKEN = "    TELEGRAM_TOKEN = "7876191804:AAFV_DzkJRNHEHgVKTH-X3ubHGbDOYCOpYA"
+    TELEGRAM_TOKEN = "7876191804:AAFV_DzkJRNHEHgVKTH-X3ubHGbDOYCOpYA"
 
     # إعداد التطبيق
     application = Application.builder().token(TELEGRAM_TOKEN).build()
