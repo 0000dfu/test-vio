@@ -2,7 +2,7 @@ import asyncio
 from playwright.async_api import async_playwright
 import random
 from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # قائمة User-Agent لمحاكاة التصفح الطبيعي
 USER_AGENTS = [
@@ -11,133 +11,115 @@ USER_AGENTS = [
     "Mozilla/5.0 (Linux; Android 10; SM-A205U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5043.102 Mobile Safari/537.36",
 ]
 
-async def watch_youtube_video(video_url, proxy=None):
+class YouTubeViewer:
     """
-    محاكاة مشاهدة فيديو على YouTube لضمان تسجيل مشاهدة.
-    
-    Args:
-        video_url (str): رابط الفيديو.
-        proxy (str): إعدادات البروكسي (اختياري).
+    Class to manage YouTube video watching functionality.
     """
-    async with async_playwright() as p:
-        # إعداد المتصفح
-        browser_args = ["--no-sandbox", "--disable-setuid-sandbox"]
-        if proxy:
-            # إعداد البروكسي إذا تم تمريره
-            browser_args.append(f"--proxy-server={proxy}")
+    def __init__(self, user_agents=None):
+        self.user_agents = user_agents or USER_AGENTS
 
-        # تشغيل المتصفح في وضع headless
-        browser = await p.chromium.launch(headless=True, args=browser_args)
-        context = await browser.new_context(user_agent=random.choice(USER_AGENTS))
-        page = await context.new_page()
+    async def watch_video(self, video_url, proxy=None):
+        """
+        Simulate watching a YouTube video to ensure a view is recorded.
+        
+        Args:
+            video_url (str): The YouTube video URL.
+            proxy (str): Proxy settings (optional).
+        """
+        async with async_playwright() as p:
+            # Configure browser
+            browser_args = ["--no-sandbox", "--disable-setuid-sandbox"]
+            if proxy:
+                browser_args.append(f"--proxy-server={proxy}")
 
-        try:
-            # فتح الفيديو
-            print(f"🌐 فتح الفيديو: {video_url}")
-            await page.goto(video_url, timeout=60000)
-            print("✅ تم فتح الفيديو بنجاح.")
+            # Launch the browser in headless mode
+            browser = await p.chromium.launch(headless=True, args=browser_args)
+            context = await browser.new_context(user_agent=random.choice(self.user_agents))
+            page = await context.new_page()
 
-            # الانتظار قليلاً لتأكد من تحميل الفيديو
-            await asyncio.sleep(5)
+            try:
+                print(f"🌐 Opening video: {video_url}")
+                await page.goto(video_url, timeout=60000)
+                print("✅ Page loaded successfully.")
 
-            # تشغيل الفيديو
-            print("🎥 تشغيل الفيديو...")
-            play_button = await page.query_selector("button[aria-label='Play']")
-            if play_button:
-                await play_button.click()
+                # Wait for video to load
+                await asyncio.sleep(5)
 
-            # مشاهدة الفيديو لمدة 35-50 ثانية
-            watch_time = random.randint(350, 500)
-            print(f"⏳ مشاهدة الفيديو لمدة {watch_time} ثانية...")
-            await asyncio.sleep(watch_time)
+                # Play the video
+                print("🎥 Playing the video...")
+                play_button = await page.query_selector("button[aria-label='Play']")
+                if play_button:
+                    await play_button.click()
 
-            # التفاعل مع الفيديو (اختياري)
-            if random.choice([True, False]):
-                print("🔄 تغيير جودة الفيديو...")
-                quality_menu = await page.query_selector("button[aria-label='Settings']")
-                if quality_menu:
-                    await quality_menu.click()
-                    await asyncio.sleep(2)  # انتظار قائمة الجودة
-                    quality_option = await page.query_selector("span:has-text('480p')")
-                    if quality_option:
-                        await quality_option.click()
+                # Watch the video for a random duration
+                watch_time = random.randint(35, 50)
+                print(f"⏳ Watching the video for {watch_time} seconds...")
+                await asyncio.sleep(watch_time)
 
-            print("✅ تم إنهاء المشاهدة بنجاح.")
-        except Exception as e:
-            print(f"❌ حدث خطأ أثناء المشاهدة: {e}")
-        finally:
-            # إغلاق المتصفح
-            await browser.close()
+                # Optional: Interact with the video (change quality)
+                if random.choice([True, False]):
+                    print("🔄 Changing video quality...")
+                    quality_menu = await page.query_selector("button[aria-label='Settings']")
+                    if quality_menu:
+                        await quality_menu.click()
+                        await asyncio.sleep(2)  # Wait for the quality menu
+                        quality_option = await page.query_selector("span:has-text('480p')")
+                        if quality_option:
+                            await quality_option.click()
 
-def start(update: Update, context: CallbackContext) -> None:
-    """
-    أمر /start لعرض رسالة ترحيب.
-    """
-    update.message.reply_text(
-        "👋 أهلاً بك في روبوت مشاهدات YouTube.\n"
-        "أرسل رابط فيديو YouTube لبدء مشاهدة تلقائية."
-    )
+                print("✅ Finished watching the video.")
+            except Exception as e:
+                print(f"❌ Error while watching the video: {e}")
+            finally:
+                # Close the browser
+                await browser.close()
 
-def watch(update: Update, context: CallbackContext) -> None:
-    """
-    أمر لاستقبال رابط الفيديو وبدء المشاهدة.
-    """
-    if len(context.args) < 1:
-        update.message.reply_text("❌ يرجى إرسال رابط الفيديو بعد الأمر.")
-        return
+# Instance of YouTubeViewer
+viewer = YouTubeViewer()
 
-    video_url = context.args[0]
-    update.message.reply_text(f"🚀 بدء المشاهدة للفيديو: {video_url}")
-
-    # تشغيل وظيفة المشاهدة باستخدام asyncio
-    asyncio.run(watch_youtube_video(video_url))
-
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-# وظيفة أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    أمر /start لعرض رسالة ترحيب.
+    Handle the /start command to display a welcome message.
     """
     await update.message.reply_text(
-        "👋 أهلاً بك في روبوت مشاهدات YouTube.\n"
-        "أرسل رابط فيديو YouTube لبدء مشاهدة تلقائية."
+        "👋 Welcome to the YouTube Views Bot.\n"
+        "Send a YouTube video link to start viewing automatically."
     )
 
-# وظيفة أمر /watch
 async def watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
-    أمر /watch لاستقبال رابط الفيديو وبدء المشاهدة.
+    Handle the /watch command to start viewing a YouTube video.
     """
     if not context.args:
-        await update.message.reply_text("❌ يرجى إرسال رابط الفيديو بعد الأمر.")
+        await update.message.reply_text("❌ Please provide a YouTube video link after the command.")
         return
 
     video_url = context.args[0]
-    await update.message.reply_text(f"🚀 بدء المشاهدة للفيديو: {video_url}")
+    await update.message.reply_text(f"🚀 Starting to watch the video: {video_url}")
 
-    # هنا يمكنك استدعاء وظيفة مشاهدة الفيديو (watch_youtube_video)
-    # مثال:
-    # await watch_youtube_video(video_url)
+    # Start watching the video
+    try:
+        await viewer.watch_video(video_url)
+        await update.message.reply_text(f"✅ Finished watching: {video_url}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Error: {e}")
 
-# الوظيفة الرئيسية لتشغيل الروبوت
 def main() -> None:
     """
-    تشغيل الروبوت.
+    Run the Telegram bot.
     """
-    # ضع هنا توكن البوت الخاص بك
+    # Your Telegram bot token
     TELEGRAM_TOKEN = "7876191804:AAFV_DzkJRNHEHgVKTH-X3ubHGbDOYCOpYA"
 
-    # إعداد التطبيق
+    # Initialize the bot application
     application = Application.builder().token(TELEGRAM_TOKEN).build()
 
-    # إضافة الأوامر
+    # Add command handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("watch", watch))
 
-    # تشغيل الروبوت
-    print("🤖 يعمل الروبوت الآن...")
+    # Run the bot
+    print("🤖 Bot is running...")
     application.run_polling()
 
 if __name__ == "__main__":
