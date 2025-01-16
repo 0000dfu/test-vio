@@ -1,7 +1,6 @@
-# استخدم صورة Python الأساسية
 FROM python:3.10-slim
 
-# تثبيت المتطلبات الأساسية للنظام لتشغيل Playwright
+# تثبيت التبعيات الأساسية
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libatk1.0-0 \
@@ -15,21 +14,16 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libgdk-pixbuf2.0-0 \
     libgtk-3-0 \
-    wget \
-    curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    libgbm1 \
+    libdrm2 \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # تثبيت Playwright
 RUN pip install --no-cache-dir playwright && playwright install
 
-# تثبيت المكتبات المطلوبة للبوت
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
-# نسخ الكود إلى حاوية التشغيل
+# نسخ الملفات إلى الحاوية
 WORKDIR /app
 COPY . /app
 
-# تحديد الأمر الرئيسي لتشغيل التطبيق
-CMD ["python", "watch_youtube_video.py"]
+# تشغيل التطبيق
+CMD ["python", "your_script_name.py"]
