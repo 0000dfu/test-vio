@@ -52,7 +52,7 @@ class YouTubeViewer:
                     await play_button.click()
 
                 # Watch the video for a random duration
-                watch_time = random.randint(35, 50)
+                watch_time = random.randint(350, 500)
                 print(f"⏳ Watching the video for {watch_time} seconds...")
                 await asyncio.sleep(watch_time)
 
