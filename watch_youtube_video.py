@@ -92,24 +92,49 @@ def watch(update: Update, context: CallbackContext) -> None:
     # تشغيل وظيفة المشاهدة باستخدام asyncio
     asyncio.run(watch_youtube_video(video_url))
 
-def main():
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    أمر /start لعرض رسالة ترحيب.
+    """
+    await update.message.reply_text(
+        "👋 أهلاً بك في روبوت مشاهدات YouTube.\n"
+        "أرسل رابط فيديو YouTube لبدء مشاهدة تلقائية."
+    )
+
+# وظيفة أمر /watch
+async def watch(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    أمر /watch لاستقبال رابط الفيديو وبدء المشاهدة.
+    """
+    if not context.args:
+        await update.message.reply_text("❌ يرجى إرسال رابط الفيديو بعد الأمر.")
+        return
+
+    video_url = context.args[0]
+    await update.message.reply_text(f"🚀 بدء المشاهدة للفيديو: {video_url}")
+
+    # هنا يمكنك استدعاء وظيفة مشاهدة الفيديو (watch_youtube_video)
+    # مثال:
+    # await watch_youtube_video(video_url)
+
+# الوظيفة الرئيسية لتشغيل الروبوت
+def main() -> None:
     """
     تشغيل الروبوت.
     """
     # ضع هنا توكن البوت الخاص بك
-    TELEGRAM_TOKEN = "7876191804:AAFV_DzkJRNHEHgVKTH-X3ubHGbDOYCOpYA"
+    TELEGRAM_TOKEN = "    TELEGRAM_TOKEN = "7876191804:AAFV_DzkJRNHEHgVKTH-X3ubHGbDOYCOpYA"
 
-    # إعداد الروبوت
-    updater = Updater(TELEGRAM_TOKEN)
+    # إعداد التطبيق
+    application = Application.builder().token(TELEGRAM_TOKEN).build()
 
     # إضافة الأوامر
-    updater.dispatcher.add_handler(CommandHandler("start", start))
-    updater.dispatcher.add_handler(CommandHandler("watch", watch))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("watch", watch))
 
     # تشغيل الروبوت
     print("🤖 يعمل الروبوت الآن...")
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == "__main__":
     main()
