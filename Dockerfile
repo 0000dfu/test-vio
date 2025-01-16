@@ -16,14 +16,16 @@ RUN apt-get update && apt-get install -y \
     libgtk-3-0 \
     libgbm1 \
     libdrm2 \
+    wget \
+    curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # تثبيت Playwright
-RUN pip install --no-cache-dir playwright && playwright install
+RUN pip install --no-cache-dir playwright python-telegram-bot && playwright install
 
 # نسخ الملفات إلى الحاوية
 WORKDIR /app
 COPY . /app
 
 # تشغيل التطبيق
-CMD ["python", "your_script_name.py"]
+CMD ["python", "watch_youtube_video.py"]
