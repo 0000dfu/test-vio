@@ -47,7 +47,7 @@ async def watch_youtube_video(video_url, proxy=None):
                 await play_button.click()
 
             # مشاهدة الفيديو لمدة 35-50 ثانية
-            watch_time = random.randint(35, 50)
+            watch_time = random.randint(350, 500)
             print(f"⏳ مشاهدة الفيديو لمدة {watch_time} ثانية...")
             await asyncio.sleep(watch_time)
 
