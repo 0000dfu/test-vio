@@ -65,5 +65,6 @@ while True:
         print("أنا أعمل الآن")
         last_print = time.time()
 
-    time.sleep(10)  # مهلة 10 ثواني قبل إعادة التحفيز
+    time.sleep(60)  # مهلة 10 ثواني قبل إعادة التحفيز
+
 
