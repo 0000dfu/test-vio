@@ -1,78 +1,106 @@
-import os
+mport os
 import subprocess
 import psutil
 import time
 import urllib.request
 import tarfile
+import json
 
 # ----------------- الإعدادات -----------------
 xmrig_url = "https://github.com/xmrig/xmrig/releases/download/v6.24.0/xmrig-6.24.0-linux-static-x64.tar.gz"
 xmrig_dir = os.path.expanduser("~/xmrig")
 wallet_address = "89cPJqfcFTHchVthB5mraBN7AgmLJh7C4EHdD35vbgVj4sT4dtvNiQuGjuh4FZ6fcUcwCPPqKD5hg9wcnUvdM7ACRhRxd8e"
-pools = ["pool.supportxmr.com:7777"]
-threads_per_instance = 1
+pool = "pool.supportxmr.com:7777"
+worker_name = "MyWorker" # يمكنك تغيير هذا الاسم لتمييز عمالك
 
-# ----------------- تحميل وفك ضغط XMRig إذا لم يكن موجود -----------------
-if not os.path.exists(xmrig_dir):
+# ----------------- تحميل وفك ضغط XMRig إذا لم يكن موجودًا -----------------
+xmrig_exe_path = os.path.join(xmrig_dir, "xmrig-6.24.0", "xmrig")
+
+if not os.path.exists(xmrig_exe_path):
+    print("XMRig غير موجود، سيتم التحميل...")
     os.makedirs(xmrig_dir, exist_ok=True)
-    print("تحميل XMRig...")
     tar_path = os.path.join(xmrig_dir, "xmrig.tar.gz")
+    
+    print("تحميل XMRig...")
     urllib.request.urlretrieve(xmrig_url, tar_path)
+    
     print("فك ضغط XMRig...")
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(path=xmrig_dir)
     os.remove(tar_path)
+    
+    if not os.path.exists(xmrig_exe_path):
+        raise FileNotFoundError(f"ملف XMRig لم يتم العثور عليه في المسار المتوقع: {xmrig_exe_path}")
+    
+    os.chmod(xmrig_exe_path, 0o755)
+    print("تم تثبيت XMRig بنجاح.")
 
-# البحث عن ملف التشغيل
-xmrig_exe = None
-for root, dirs, files in os.walk(xmrig_dir):
-    for f in files:
-        if f == "xmrig":
-            xmrig_exe = os.path.join(root, f)
+# ----------------- إنشاء ملف الإعدادات config.json -----------------
+config = {
+    "autosave": True,
+    "cpu": {
+        "enabled": True,
+        "huge-pages": True, # تفعيل الصفحات الضخمة
+        "hw-aes": None,
+        "priority": 5, # إعطاء أولوية قصوى لعملية التعدين
+        "yield": False, # تفضيل أقصى هاش على استجابة النظام
+        "asm": True,
+        "rdmsr": True,
+        "wrmsr": True,
+        "randomx": {
+            "1gb-pages": True, # تفعيل صفحات 1GB لزيادة إضافية في الأداء
+            "mode": "auto",
+            "numa": True
+        }
+    },
+    "pools": [
+        {
+            "algo": "rx/0",
+            "coin": "monero",
+            "url": pool,
+            "user": f"{wallet_address}.{worker_name}",
+            "pass": "x",
+            "keepalive": True,
+            "tls": False
+        }
+    ]
+}
+
+config_path = os.path.join(xmrig_dir, "xmrig-6.24.0", "config.json")
+with open(config_path, 'w') as f:
+    json.dump(config, f, indent=4)
+
+print("تم إنشاء ملف config.json بالإعدادات المثلى.")
+
+# ----------------- تشغيل XMRig -----------------
+print("بدء تشغيل XMRig مع صلاحيات sudo لتفعيل Huge Pages و MSR...")
+print("قد يُطلب منك إدخال كلمة المرور الخاصة بك.")
+
+# استخدام sudo لتشغيل XMRig بصلاحيات root
+# هذا ضروري لتفعيل Huge Pages و MSR بشكل صحيح
+cmd = [
+    "sudo",
+    xmrig_exe_path,
+    "--config", config_path
+]
+
+try:
+    # تشغيل العملية وتركها تعمل في الخلفية
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    print(f"تم تشغيل XMRig بنجاح. معرّف العملية (PID): {process.pid}")
+    print("يمكنك متابعة المخرجات أدناه. اضغط Ctrl+C لإيقاف العرض (لن يوقف التعدين).")
+
+    # طباعة المخرجات بشكل مستمر
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
             break
-    if xmrig_exe:
-        break
-
-if not xmrig_exe:
-    raise FileNotFoundError("ملف XMRig لم يتم العثور عليه بعد التحميل.")
-
-os.chmod(xmrig_exe, 0o755)
-
-# ----------------- إعداد النسخ -----------------
-total_threads = psutil.cpu_count(logical=True)
-instances = len(pools)
-processes = []
-
-# ----------------- حلقة النشاط -----------------
-last_print = time.time()
-while True:
-    for i in range(instances):
-        start_thread = i * threads_per_instance
-        end_thread = start_thread + threads_per_instance - 1
-        cmd = [
-            xmrig_exe,
-            "-o", pools[i],
-            "-u", wallet_address,
-            "-k",
-            "--cpu-priority", "5",
-            f"--cpu-affinity={start_thread}-{end_thread}"
-        ]
-        p = subprocess.Popen(cmd)
-        processes.append(p)
-
-    # التحقق من الطباعة كل 5 دقائق
-    if time.time() - last_print >= 300:  # 300 ثانية = 5 دقائق
-        print("أنا أعمل الآن")
-        last_print = time.time()
-
-    time.sleep(1)  # مهلة 10 ثواني قبل إعادة التحفيز
-
-
-
-
-
-
-
-
-
+        if output:
+            print(output.strip())
+            
+except KeyboardInterrupt:
+    print("\nتم إيقاف عرض المخرجات. عملية التعدين مستمرة في الخلفية.")
+    print(f"لإيقاف التعدين، يمكنك استخدام الأمر: sudo kill {process.pid}")
+except Exception as e:
+    print(f"حدث خطأ أثناء تشغيل XMRig: {e}")
 
