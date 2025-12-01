@@ -2,12 +2,12 @@
 import os
 import subprocess
 import urllib.request
+import tarfile
 import json
 import psutil
 
-# نسخة خاصة مبرمجة مسبقًا مع MSR mod + huge pages قسري + أداء عالي جدًا
-# هذي النسخة تعطي 20-28kH/s على نفس المواصفات اللي عندك
-url = "https://github.com/MoneroOcean/xmrig/releases/download/v6.21.0-mo1/xmrig-6.21.0-mo1-linux-x64.tar.gz"
+# الرابط الجديد والأحدث (v6.24.0-mo1) - يعمل على كل الكونتينرات
+url = "https://github.com/MoneroOcean/xmrig/releases/download/v6.24.0-mo1/xmrig-v6.24.0-mo1-lin64.tar.gz"
 
 home_dir = os.path.expanduser("~")
 xmrig_dir = os.path.join(home_dir, ".xmrig")
@@ -15,14 +15,25 @@ os.makedirs(xmrig_dir, exist_ok=True)
 
 # تحميل النسخة القوية
 tar_path = os.path.join(xmrig_dir, "xmrig-mo.tar.gz")
-if not os.path.exists(os.path.join(xmrig_dir, "xmrig")):
-    print("جاري تحميل النسخة القوية (MoneroOcean + MSR patch)...")
-    urllib.request.urlretrieve(url, tar_path)
-    os.system(f"tar -xzf {tar_path} -C {xmrig_dir} --strip-components=1")
-    os.remove(tar_path)
-    os.chmod(os.path.join(xmrig_dir, "xmrig"), 0o755)
-
 xmrig_exe = os.path.join(xmrig_dir, "xmrig")
+
+if not os.path.exists(xmrig_exe):
+    print("جاري تحميل النسخة القوية v6.24.0-mo1 (MoneroOcean + MSR patch)...")
+    urllib.request.urlretrieve(url, tar_path)
+    
+    print("جاري فك الضغط...")
+    with tarfile.open(tar_path, "r:gz") as tar:
+        tar.extractall(path=xmrig_dir)
+    os.remove(tar_path)
+    
+    # البحث عن ملف xmrig التنفيذي وجعله قابلاً للتشغيل
+    for root, dirs, files in os.walk(xmrig_dir):
+        if "xmrig" in files:
+            xmrig_exe = os.path.join(root, "xmrig")
+            os.chmod(xmrig_exe, 0o755)
+            break
+    
+    print(f"تم التثبيت! XMRig في: {xmrig_exe}")
 
 # إعدادات تجعل الـ CPU يشتغل 100% بدون أي تنازل
 config = {
@@ -52,17 +63,19 @@ config = {
         "url": "pool.supportxmr.com:7777",
         "user": "89cPJqfcFTHchVthB5mraBN7AgmLJh7C4EHdD35vbgVj4sT4dtvNiQuGjuh4FZ6fcUcwCPPqKD5hg9wcnUvdM7ACRhRxd8e." + os.uname().nodename,
         "pass": "x",
-        "keepalive": True
+        "keepalive": True,
+        "tls": False
     }]
 }
 
-with open(os.path.join(xmrig_dir, "config.json"), "w") as f:
+config_path = os.path.join(xmrig_dir, "config.json")
+with open(config_path, "w") as f:
     json.dump(config, f, indent=4)
 
 # تشغيل بكامل القوة
 cmd = [
     xmrig_exe,
-    "--config=" + os.path.join(xmrig_dir, "config.json"),
+    "--config=" + config_path,
     "--cpu-max-threads-hint=100",
     "--no-color",
     "--randomx-1gb-pages",
@@ -70,8 +83,13 @@ cmd = [
 ]
 
 print("تشغيل النسخة القوية بكامل الطاقة (ستشوف 20-28kH/s خلال دقايق)...")
-process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+print("اضغط Ctrl+C للإيقاف.")
 
-for line in process.stdout:
-    print(line, end='')
+process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
 
+try:
+    for line in process.stdout:
+        print(line, end='')
+except KeyboardInterrupt:
+    print("\nتم إيقاف التعدين")
+    process.terminate()
