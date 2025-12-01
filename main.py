@@ -1,4 +1,4 @@
-mport os
+import os
 import subprocess
 import psutil
 import time
@@ -103,4 +103,5 @@ except KeyboardInterrupt:
     print(f"لإيقاف التعدين، يمكنك استخدام الأمر: sudo kill {process.pid}")
 except Exception as e:
     print(f"حدث خطأ أثناء تشغيل XMRig: {e}")
+
 
