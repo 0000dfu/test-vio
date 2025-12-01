@@ -1,10 +1,12 @@
-
 import os
 import subprocess
 import urllib.request
 import tarfile
 import json
 import psutil
+import time
+
+
 
 # الرابط الـ static الرسمي (لا يحتاج مكتبات خارجية)
 url = "https://github.com/xmrig/xmrig/releases/download/v6.24.0/xmrig-6.24.0-linux-static-x64.tar.gz"
@@ -108,3 +110,11 @@ try:
 except KeyboardInterrupt:
     print("\nتم إيقاف التعدين")
     process.terminate()
+
+while True:
+    for i in range(1, 11):
+        os.system('cls' if os.name == 'nt' else 'clear')  # يمسح الشاشة
+        print("        ", i, "        ")   # طباعة الرقم في المنتصف تقريباً
+        time.sleep(1)
+
+
