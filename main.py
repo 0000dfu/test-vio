@@ -1,10 +1,10 @@
 import os
 import subprocess
-import time
 import urllib.request
 import tarfile
 import json
 import psutil
+import glob
 
 # ----------------- الإعدادات -----------------
 xmrig_url = "https://github.com/xmrig/xmrig/releases/download/v6.24.0/xmrig-6.24.0-linux-static-x64.tar.gz"
@@ -12,86 +12,101 @@ home_dir = os.path.expanduser("~")
 xmrig_dir = os.path.join(home_dir, ".xmrig")
 wallet_address = "89cPJqfcFTHchVthB5mraBN7AgmLJh7C4EHdD35vbgVj4sT4dtvNiQuGjuh4FZ6fcUcwCPPqKD5hg9wcnUvdM7ACRhRxd8e"
 pool = "pool.supportxmr.com:7777"
-worker_name = os.uname().nodename  # اسم الجهاز كـ worker
+worker_name = os.uname().nodename
 
-xmrig_exe_path = os.path.join(xmrig_dir, "xmrig")
+os.makedirs(xmrig_dir, exist_ok=True)
 
-# ----------------- تحميل وتثبيت XMRig -----------------
-if not os.path.exists(xmrig_exe_path):
-    os.makedirs(xmrig_dir, exist_ok=True)
-    tar_path = os.path.join(xmrig_dir, "xmrig.tar.gz")
-    print("جاري تحميل XMRig v6.24.0...")
+# ----------------- تحميل واستخراج XMRig -----------------
+tar_path = os.path.join(xmrig_dir, "xmrig.tar.gz")
+
+if not glob.glob(os.path.join(xmrig_dir, "**/xmrig"), recursive=True):
+    print("جاري تحميل XMRig...")
     urllib.request.urlretrieve(xmrig_url, tar_path)
+    
+    print("جاري فك الضغط...")
     with tarfile.open(tar_path, "r:gz") as tar:
-        tar.extractall(path=xmrig_dir)
+        tar.extractall(path=xmrig_dir, filter='data')  # filter='data' لتجنب التحذير في بايثون 3.14+
+    
     os.remove(tar_path)
-    os.chmod(xmrig_exe_path, 0o755)
-    print("تم تثبيت XMRig بنجاح")
+    print("تم التحميل والفك بنجاح")
 
-# ----------------- أقوى إعدادات ممكنة بدون روت -----------------
+# ----------------- إيجاد مسار xmrig التنفيذي تلقائيًا -----------------
+xmrig_exe_path = None
+for root, dirs, files in os.walk(xmrig_dir):
+    if "xmrig" in files:
+        candidate = os.path.join(root, "xmrig")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK) or not candidate.endswith(".exe"):
+            xmrig_exe_path = candidate
+            break
+
+if not xmrig_exe_path:
+    # البحث بالـ glob (أكثر موثوقية)
+    matches = glob.glob(os.path.join(xmrig_dir, "**/xmrig"), recursive=True)
+    if matches:
+        xmrig_exe_path = matches[0]
+
+if not xmrig_exe_path or not os.path.exists(xmrig_exe_path):
+    raise FileNotFoundError("لم يتم العثور على ملف xmrig التنفيذي! تأكد من التحميل.")
+
+# جعله قابل للتنفيذ
+os.chmod(xmrig_exe_path, 0o755)
+print(f"تم العثور على XMRig في: {xmrig_exe_path}")
+
+# ----------------- إعداد config.json بأقوى إعدادات -----------------
 config = {
     "autosave": True,
     "background": False,
-    "colors": True,
+    "colors": False,
+    "donate-level": 0,
     "cpu": {
         "enabled": True,
-        "huge-pages": True,       # يشتغل عادةً حتى بدون روت على أغلب التوزيعات
-        "huge-pages-jit": True,   # أسرع كثير
-        "hw-aes": True,           # استخدام تعليمات AES-NI إن وجدت
-        "priority": 5,            # أعلى أولوية ممكنة بدون روت
-        "memory-pool": False,
-        "yield": False,           # لا يتنازل عن الـ CPU أبدًا
-        "max-threads-hint": 100,  # يستخدم كل الأنوية 100%
+        "huge-pages": True,
+        "huge-pages-jit": True,
+        "hw-aes": True,
+        "priority": 5,
+        "yield": False,
+        "max-threads-hint": 100,
         "asm": True,
         "randomx": {
-            "init": -1,           # كل الأنوية للـ init
-            "mode": "fast",       # أسرع وضع (بدل auto)
-            "1gb-pages": True,    # إن كان مدعوم
+            "init": -1,
+            "mode": "fast",
+            "1gb-pages": True,
             "numa": True,
             "scratchpad_prefetch_mode": 1
         }
     },
-    "donate-level": 0,            # تبرع 0% (لأنك صاحب الجهاز)
-    "pools": [
-        {
-            "algo": "rx/0",
-            "coin": "monero",
-            "url": pool,
-            "user": f"{wallet_address}.{worker_name}",
-            "pass": "x",
-            "keepalive": True,
-            "tls": False,
-            "daemon": False
-        }
-    ],
-    "print-time": 5,
-    "retries": 5,
-    "retry-pause": 1
+    "pools": [{
+        "algo": "rx/0",
+        "url": pool,
+        "user": f"{wallet_address}.{worker_name}",
+        "pass": "x",
+        "keepalive": True,
+        "tls": False
+    }],
+    "retries": 10,
+    "retry-pause": 1,
+    "print-time": 5
 }
 
 config_path = os.path.join(xmrig_dir, "config.json")
 with open(config_path, 'w') as f:
     json.dump(config, f, indent=4)
 
-# ----------------- تشغيل XMRig بأقوى أداء -----------------
-print("تشغيل XMRig بأقصى طاقة ممكنة...")
+# ----------------- تشغيل XMRig بكامل الطاقة -----------------
 cmd = [
     xmrig_exe_path,
     "--config=" + config_path,
-    "--threads=" + str(psutil.cpu_count()),  # كل الأنوية
     "--cpu-max-threads-hint=100",
-    "--no-color",
-    "--variant=1"
+    "--no-color"
 ]
 
-process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+print("جاري تشغيل XMRig بأقصى طاقة...")
+process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
 
-print(f"تم التشغيل! PID: {process.pid}")
-print("جاري التعدين بكامل الطاقة... (اضغط Ctrl+C للإيقاف)")
-
+print("التعدين بدأ بكامل الطاقة! اضغط Ctrl+C للإيقاف")
 try:
     for line in process.stdout:
-        print(line.strip())
+        print(line, end='')
 except KeyboardInterrupt:
-    print("\nتم إيقاف التعدين.")
+    print("\nتم إيقاف التعدين")
     process.terminate()
