@@ -26,7 +26,8 @@ if not os.path.exists(xmrig_exe_path):
     
     print("فك ضغط XMRig...")
     with tarfile.open(tar_path, "r:gz") as tar:
-        tar.extractall(path=xmrig_dir)
+        # The filter argument is added to address the DeprecationWarning
+        tar.extractall(path=xmrig_dir, filter='data')
     os.remove(tar_path)
     
     if not os.path.exists(xmrig_exe_path):
@@ -40,15 +41,15 @@ config = {
     "autosave": True,
     "cpu": {
         "enabled": True,
-        "huge-pages": True, # تفعيل الصفحات الضخمة
+        "huge-pages": True,
         "hw-aes": None,
-        "priority": 5, # إعطاء أولوية قصوى لعملية التعدين
-        "yield": False, # تفضيل أقصى هاش على استجابة النظام
+        "priority": 5,
+        "yield": False,
         "asm": True,
         "rdmsr": True,
         "wrmsr": True,
         "randomx": {
-            "1gb-pages": True, # تفعيل صفحات 1GB لزيادة إضافية في الأداء
+            "1gb-pages": True,
             "mode": "auto",
             "numa": True
         }
@@ -73,24 +74,19 @@ with open(config_path, 'w') as f:
 print("تم إنشاء ملف config.json بالإعدادات المثلى.")
 
 # ----------------- تشغيل XMRig -----------------
-print("بدء تشغيل XMRig مع صلاحيات sudo لتفعيل Huge Pages و MSR...")
-print("قد يُطلب منك إدخال كلمة المرور الخاصة بك.")
+print("بدء تشغيل XMRig...")
 
-# استخدام sudo لتشغيل XMRig بصلاحيات root
-# هذا ضروري لتفعيل Huge Pages و MSR بشكل صحيح
+# تم تعديل هذا الجزء: تمت إزالة 'sudo' من أمر التشغيل
 cmd = [
-    "sudo",
     xmrig_exe_path,
     "--config", config_path
 ]
 
 try:
-    # تشغيل العملية وتركها تعمل في الخلفية
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     print(f"تم تشغيل XMRig بنجاح. معرّف العملية (PID): {process.pid}")
     print("يمكنك متابعة المخرجات أدناه. اضغط Ctrl+C لإيقاف العرض (لن يوقف التعدين).")
 
-    # طباعة المخرجات بشكل مستمر
     while True:
         output = process.stdout.readline()
         if output == '' and process.poll() is not None:
@@ -100,8 +96,7 @@ try:
             
 except KeyboardInterrupt:
     print("\nتم إيقاف عرض المخرجات. عملية التعدين مستمرة في الخلفية.")
-    print(f"لإيقاف التعدين، يمكنك استخدام الأمر: sudo kill {process.pid}")
+    print(f"لإيقاف التعدين، يمكنك استخدام الأمر: kill {process.pid}")
 except Exception as e:
     print(f"حدث خطأ أثناء تشغيل XMRig: {e}")
-
 
