@@ -111,10 +111,4 @@ except KeyboardInterrupt:
     print("\nتم إيقاف التعدين")
     process.terminate()
 
-while True:
-    for i in range(1, 11):
-        os.system('cls' if os.name == 'nt' else 'clear')  # يمسح الشاشة
-        print("        ", i, "        ")   # طباعة الرقم في المنتصف تقريباً
-        time.sleep(1)
-
 
